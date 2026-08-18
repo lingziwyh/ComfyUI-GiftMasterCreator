@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "profile": "LOW_COIN_GIFT",
+  "currency": "douyin_coin",
+  "range": {"minimum": 99, "maximum": 999, "default": 499},
+  "frame_model": {
+    "fps": 24,
+    "legal_frame_rule": "5 + 17*n",
+    "selection": "nearest_to_product_target"
+  },
+  "tiers": [
+    {
+      "minimum": 99,
+      "maximum": 299,
+      "product_duration_seconds": 3,
+      "frames": 73,
+      "effective_duration_seconds": 3.041667,
+      "content_budget": "one subject, one simple motion chain, one readable payoff"
+    },
+    {
+      "minimum": 300,
+      "maximum": 499,
+      "product_duration_seconds": 4,
+      "frames": 90,
+      "effective_duration_seconds": 3.75,
+      "content_budget": "one subject, one developed motion or state change, one payoff"
+    },
+    {
+      "minimum": 500,
+      "maximum": 999,
+      "product_duration_seconds": 4,
+      "frames": 90,
+      "effective_duration_seconds": 3.75,
+      "content_budget": "one subject, one clear action progression, restrained supporting response"
+    }
+  ],
+  "hard_constraints": {
+    "single_play": true,
+    "shot_count": 1,
+    "silent": true,
+    "allowed_aspect_ratios": ["1:1", "4:3"],
+    "default_aspect_ratio": "1:1"
+  },
+  "background_policy": [
+    {
+      "minimum": 99,
+      "maximum": 499,
+      "kind": "uniform_solid_color",
+      "fixed_color_value": false,
+      "must_remain_unchanged": true,
+      "scene_background_allowed": false
+    },
+    {
+      "minimum": 500,
+      "maximum": 999,
+      "kind": "compact_scene_or_uniform_solid_color",
+      "fixed_color_value": false,
+      "must_remain_unchanged_when_solid": true,
+      "scene_background_allowed": true
+    }
+  ],
+  "priority": [
+    "exact_image_endpoints",
+    "hard_profile_constraints",
+    "explicit_user_content",
+    "inferred_content"
+  ]
+}

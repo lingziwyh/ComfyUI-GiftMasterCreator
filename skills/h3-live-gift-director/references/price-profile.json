@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "profile": "LIVE_GIFT",
+  "currency": "douyin_coin",
+  "range": {"minimum": 1000, "maximum": 3000, "default": 2000},
+  "frame_model": {
+    "fps": 24,
+    "legal_frame_rule": "5 + 17*n",
+    "selection": "align_requested_duration"
+  },
+  "defaults": {
+    "duration_seconds": 5,
+    "aspect_ratio": "1:1",
+    "shot_structure": "one_continuous_or_two_purposeful_shots",
+    "single_unassigned_image_mode": "Ref2VA",
+    "silent_when_unspecified": true
+  },
+  "tiers": [
+    {
+      "minimum": 1000,
+      "maximum": 1499,
+      "typical_duration_seconds": [4, 4],
+      "typical_shots": [1, 2],
+      "content_budget": "one principal subject, one causal event, one climax, compact environment"
+    },
+    {
+      "minimum": 1500,
+      "maximum": 2199,
+      "typical_duration_seconds": [5, 5],
+      "typical_shots": [1, 2],
+      "content_budget": "clear setup-change-result progression with a moderate environment response"
+    },
+    {
+      "minimum": 2200,
+      "maximum": 3000,
+      "typical_duration_seconds": [5, 6],
+      "typical_shots": [2, 3],
+      "content_budget": "two-stage progression, broader reveal, coordinated but subordinate environment responses"
+    }
+  ],
+  "policy": {
+    "explicit_duration_overrides_typical": true,
+    "explicit_shot_count_overrides_typical_when_coherent": true,
+    "preserve_explicit_over_range_imagery": true,
+    "warn_once_for_over_range_imagery": true,
+    "quality_floor": [
+      "stable_identity_and_geometry",
+      "controlled_camera_motion",
+      "readable_causality",
+      "intentional_transitions",
+      "clean_composition"
+    ],
+    "inferred_content_ceiling": [
+      "avoid_civilization_or_world_scale_spectacle",
+      "avoid_prestige_adult_mythical_beasts",
+      "avoid_extensive_jewel_material_systems",
+      "avoid_prolonged_full_frame_effect_storms"
+    ]
+  }
+}

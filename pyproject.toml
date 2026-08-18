@@ -1,0 +1,24 @@
+[project]
+name = "giftmaster-creator"
+version = "1.0.0"
+description = "Lightweight API and Skill nodes for creating H3 live-gift prompts in ComfyUI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "lingziwyh" }]
+keywords = ["comfyui", "live-gift", "prompt-engineering", "h3"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/lingziwyh/ComfyUI-GiftMasterCreator"
+Issues = "https://github.com/lingziwyh/ComfyUI-GiftMasterCreator/issues"
+
+[tool.comfy]
+PublisherId = "lingziwyh"
+DisplayName = "GiftMasterCreator"

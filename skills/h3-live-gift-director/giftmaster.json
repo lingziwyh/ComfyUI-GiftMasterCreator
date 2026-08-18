@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "h3-live-gift-director",
+  "display_name": "H3 直播礼物导演",
+  "profile": "LIVE_GIFT",
+  "skill_file": "SKILL.md",
+  "price_range": {
+    "currency": "douyin_coin",
+    "minimum": 1000,
+    "maximum": 3000,
+    "default": 2000
+  },
+  "supported_modes": ["T2VA", "I2VA", "FL2VA", "L2VA", "Ref2VA"],
+  "image_requirements": {
+    "T2VA": {"minimum": 0, "maximum": 0},
+    "I2VA": {"minimum": 1, "maximum": 1},
+    "FL2VA": {"minimum": 2, "maximum": 2},
+    "L2VA": {"minimum": 1, "maximum": 1},
+    "Ref2VA": {"minimum": 1, "maximum": 9}
+  },
+  "runtime_references": [
+    "references/price-profile.json",
+    "references/format.md"
+  ],
+  "evaluation_only_references": [],
+  "output_language": "en",
+  "output_kind": "h3_prompt"
+}

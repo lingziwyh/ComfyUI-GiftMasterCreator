@@ -1,0 +1,1 @@
+"""GiftMasterCreator test suite."""

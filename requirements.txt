@@ -1,0 +1,3 @@
+# No additional Python packages are required.
+# GiftMasterCreator uses the Python standard library and the runtime APIs
+# already provided by ComfyUI.
