@@ -11,6 +11,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Nothing yet.
 
+## [1.2.0] - 2026-08-18
+
+### Added
+
+- Added a versioned runtime bridge for trusted companion extensions.
+- Added fixed, memory-only credential slots that are bound to the exact API
+  endpoint, protocol, model, deployment, API version, and authentication mode.
+
+### Fixed
+
+- On Windows, newly created per-user `GIFTMASTER_` credentials can now be read
+  without restarting an already-running launcher that did not inherit them.
+- Kept each API key and its `_ORIGIN` allowlist atomic: both values must come
+  from the process environment or both from the current user's environment.
+- Replaced the misleading missing-key message that referenced an unavailable
+  session-key input.
+
+### Security
+
+- Session-key references are now excluded from `APIConfig` diagnostics.
+- Runtime credential slots expose no secret or bearer-style session reference.
+  Their fixed, non-secret identifiers are useful only with the exact API
+  configuration to which the in-memory credential was bound.
+
 ## [1.1.0] - 2026-08-18
 
 ### Added

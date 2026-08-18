@@ -29,6 +29,11 @@ personal data, and private media with harmless placeholders.
   password-looking ComfyUI widget can still serialize plaintext into workflow
   and browser state, so environment credentials are required for authenticated
   requests.
+- Trusted companion extensions may use the versioned, runtime-only credential
+  slot interface. A slot is bound to one exact API configuration and stores no
+  key on disk, but it is a process-wide capability. Use it only when ComfyUI is
+  bound exclusively to loopback on a single-user workstation; never expose
+  such a session through a LAN listener, permissive CORS, or reverse proxy.
 - Never commit or share a workflow containing a real key. Revoke and rotate a
   key immediately if it may have been exposed.
 - Use a dedicated, least-privilege key with provider-side spending limits when

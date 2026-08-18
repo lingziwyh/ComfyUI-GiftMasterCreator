@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import errno
 import http.client
@@ -22,10 +22,41 @@ from .errors import APIError, ConfigurationError
 PROTOCOLS = ("openai_chat", "openai_responses", "azure_openai_chat")
 AZURE_AUTH_MODES = ("api_key", "bearer", "bytedance_compat")
 _KEY_VAULT: Dict[str, Tuple[str, str, float]] = {}
+_KEY_SLOTS: Dict[str, Tuple[str, str, float, Tuple[Any, ...]]] = {}
 _KEY_LOCK = threading.Lock()
+_KEY_TTL_SECONDS = 12 * 60 * 60
 _SENSITIVE_QUERY = re.compile(r"(?:api[-_]?key|token|secret|auth|signature|credential|password)", re.I)
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SLOT_NAME = re.compile(r"^GIFTMASTER_[A-Z0-9_]{1,127}$")
 _RETRY_CODES = {429}
+
+
+def _read_windows_user_environment(name: str) -> str:
+    """Read a newly-set per-user variable without requiring an app restart."""
+    if os.name != "nt":
+        return ""
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            value, _value_type = winreg.QueryValueEx(key, name)
+    except (ImportError, OSError):
+        return ""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _credential_values(name: str) -> Tuple[str, str]:
+    """Read a key and its origin allowlist from one configuration source."""
+    origin_name = name + "_ORIGIN"
+    if name in os.environ:
+        return (
+            os.environ.get(name, "").strip(),
+            os.environ.get(origin_name, "").strip(),
+        )
+    value = _read_windows_user_environment(name)
+    if not value:
+        return "", ""
+    return value, _read_windows_user_environment(origin_name)
 
 
 @dataclass(frozen=True)
@@ -34,7 +65,8 @@ class APIConfig:
     base_url: str = "https://api.openai.com/v1"
     model: str = ""
     api_key_env: str = "GIFTMASTER_API_KEY"
-    api_key_ref: str = ""
+    api_key_ref: str = field(default="", repr=False)
+    api_key_slot: str = ""
     no_auth: bool = False
     timeout_seconds: int = 120
     retries: int = 0
@@ -87,7 +119,7 @@ def store_session_key(value: str, origin_scope: str = "") -> str:
     ref = secrets.token_urlsafe(18)
     with _KEY_LOCK:
         now = time.time()
-        expired = [key for key, (_value, _host, created) in _KEY_VAULT.items() if now - created > 12 * 60 * 60]
+        expired = [key for key, (_value, _host, created) in _KEY_VAULT.items() if now - created > _KEY_TTL_SECONDS]
         for key in expired:
             _KEY_VAULT.pop(key, None)
         while len(_KEY_VAULT) >= 64:
@@ -100,11 +132,86 @@ def store_session_key(value: str, origin_scope: str = "") -> str:
 def clear_session_keys() -> None:
     with _KEY_LOCK:
         _KEY_VAULT.clear()
+        _KEY_SLOTS.clear()
+
+
+def _validate_slot_name(name: str) -> str:
+    value = str(name or "").strip()
+    if not _SLOT_NAME.fullmatch(value):
+        raise ConfigurationError("会话凭证槽名称必须以 GIFTMASTER_ 开头，并且只能包含大写字母、数字和下划线。")
+    return value
+
+
+def _validate_session_secret(value: str) -> str:
+    if not isinstance(value, str):
+        raise ConfigurationError("API 密钥必须是字符串。")
+    secret = value.strip()
+    if not secret:
+        raise ConfigurationError("API 密钥不能为空。")
+    if len(secret) > 8192 or any(character in secret for character in ("\r", "\n", "\x00")):
+        raise ConfigurationError("API 密钥格式无效。")
+    return secret
+
+
+def _slot_binding(config: APIConfig, endpoint: Optional[str] = None) -> Tuple[Any, ...]:
+    final_endpoint = endpoint or build_endpoint(config)
+    return (
+        config.protocol,
+        final_endpoint,
+        config.model.strip(),
+        bool(config.no_auth),
+        bool(config.allow_insecure_http),
+        config.azure_deployment.strip(),
+        config.api_version.strip(),
+        config.azure_auth,
+    )
+
+
+def store_session_key_slot(name: str, value: str, config: APIConfig) -> None:
+    """Atomically replace a fixed, runtime-only credential slot.
+
+    Slots are intended for trusted local extensions. The secret is bound to the
+    complete security-relevant API configuration so the slot cannot be reused
+    with another endpoint, deployment, model, or authentication mode.
+    """
+
+    slot = _validate_slot_name(name)
+    secret = _validate_session_secret(value)
+    if config.api_key_slot != slot or config.api_key_ref or config.api_key_env or config.no_auth:
+        raise ConfigurationError("会话凭证槽必须绑定到唯一、需要鉴权且不含其他密钥来源的 API 配置。")
+    endpoint = build_endpoint(config)
+    origin_scope = _origin(endpoint)
+    binding = _slot_binding(config, endpoint)
+    with _KEY_LOCK:
+        now = time.time()
+        expired = [key for key, (_value, _origin, created, _binding) in _KEY_SLOTS.items() if now - created > _KEY_TTL_SECONDS]
+        for key in expired:
+            _KEY_SLOTS.pop(key, None)
+        _KEY_SLOTS[slot] = (secret, origin_scope, now, binding)
+
+
+def clear_session_key_slot(name: str) -> bool:
+    slot = _validate_slot_name(name)
+    with _KEY_LOCK:
+        return _KEY_SLOTS.pop(slot, None) is not None
+
+
+def is_session_key_slot_configured(name: str) -> bool:
+    slot = _validate_slot_name(name)
+    with _KEY_LOCK:
+        stored = _KEY_SLOTS.get(slot)
+        if stored and time.time() - stored[2] <= _KEY_TTL_SECONDS:
+            return True
+        if stored:
+            _KEY_SLOTS.pop(slot, None)
+        return False
 
 
 def _resolve_key(config: APIConfig, endpoint: str) -> str:
     if config.no_auth:
         return ""
+    if config.api_key_slot and (config.api_key_ref or config.api_key_env):
+        raise ConfigurationError("会话凭证槽不能与其他 API 密钥来源同时使用。")
     endpoint_parts = parse.urlsplit(endpoint)
     if endpoint_parts.scheme == "http" and not _is_loopback(endpoint_parts.hostname):
         raise ConfigurationError("带密钥的远程 API 必须使用 HTTPS；远程 HTTP 只允许显式无鉴权模式。")
@@ -113,7 +220,7 @@ def _resolve_key(config: APIConfig, endpoint: str) -> str:
     if config.api_key_ref:
         with _KEY_LOCK:
             stored = _KEY_VAULT.get(config.api_key_ref)
-            if stored and time.time() - stored[2] <= 12 * 60 * 60:
+            if stored and time.time() - stored[2] <= _KEY_TTL_SECONDS:
                 direct, direct_origin, _created = stored
             elif stored:
                 _KEY_VAULT.pop(config.api_key_ref, None)
@@ -122,16 +229,36 @@ def _resolve_key(config: APIConfig, endpoint: str) -> str:
         if direct_origin and direct_origin != endpoint_origin:
             raise ConfigurationError("本次会话密钥已绑定到另一个 API origin，请重新配置密钥。")
         return direct
+    if config.api_key_slot:
+        slot = _validate_slot_name(config.api_key_slot)
+        with _KEY_LOCK:
+            stored_slot = _KEY_SLOTS.get(slot)
+            if stored_slot and time.time() - stored_slot[2] <= _KEY_TTL_SECONDS:
+                direct, direct_origin, _created, expected_binding = stored_slot
+            else:
+                if stored_slot:
+                    _KEY_SLOTS.pop(slot, None)
+                direct = ""
+                direct_origin = ""
+                expected_binding = ()
+        if not direct:
+            raise ConfigurationError("本次 ComfyUI 会话尚未配置 API 密钥，或密钥已过期；请在内部预设节点中重新填写。")
+        endpoint_origin = _origin(endpoint)
+        if direct_origin != endpoint_origin or expected_binding != _slot_binding(config, endpoint):
+            raise ConfigurationError("会话凭证槽与当前 API 配置不匹配；已在发送网络请求前停止。")
+        return direct
     if config.api_key_env:
         if not _ENV_NAME.fullmatch(config.api_key_env):
             raise ConfigurationError("API 密钥环境变量名格式无效。")
         if not config.api_key_env.startswith("GIFTMASTER_"):
             raise ConfigurationError("为防止恶意工作流读取其他凭据，环境变量名必须以 GIFTMASTER_ 开头。")
-        value = os.environ.get(config.api_key_env, "").strip()
+        value, origin_allowlist = _credential_values(config.api_key_env)
         if value:
             endpoint_origin = _origin(endpoint)
             raw_origins = [
-                item.strip() for item in os.environ.get(config.api_key_env + "_ORIGIN", "").split(",") if item.strip()
+                item.strip()
+                for item in origin_allowlist.split(",")
+                if item.strip()
             ]
             allowed_origins = {_origin(item, require_root=True) for item in raw_origins}
             if endpoint_origin not in allowed_origins:
@@ -139,7 +266,7 @@ def _resolve_key(config: APIConfig, endpoint: str) -> str:
                     f"环境变量密钥未授权给 origin {endpoint_origin}；请在 {config.api_key_env}_ORIGIN 中明确填写。"
                 )
             return value
-    raise ConfigurationError("未找到 API 密钥；请设置环境变量，或在本次 ComfyUI 会话中录入密钥。")
+    raise ConfigurationError("未找到 API 密钥；请设置 API 配置中填写的 GIFTMASTER_ 环境变量。")
 
 
 def _is_loopback(hostname: Optional[str]) -> bool:
@@ -302,7 +429,7 @@ class APIClient:
         self.opener = opener or request.build_opener(_NoRedirect())
 
     def _headers(self, key: str, request_id: str = "") -> Dict[str, str]:
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.1.0"}
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.2.0"}
         if not self.config.no_auth:
             if self.config.protocol == "azure_openai_chat":
                 if self.config.azure_auth in {"api_key", "bytedance_compat"}:
@@ -448,9 +575,12 @@ __all__ = [
     "GenerationSettings",
     "build_endpoint",
     "build_request_url",
+    "clear_session_key_slot",
     "clear_session_keys",
+    "is_session_key_slot_configured",
     "parse_api_response",
     "redact_text",
     "store_session_key",
+    "store_session_key_slot",
     "validate_api_url",
 ]

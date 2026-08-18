@@ -126,11 +126,13 @@ $env:GIFTMASTER_API_KEY_ORIGIN="https://api.openai.com"
 [Environment]::SetEnvironmentVariable("GIFTMASTER_API_KEY_ORIGIN", "https://api.openai.com", "User")
 ```
 
-写入后完全退出并重新启动 ComfyUI（已有终端窗口也要重开）。
+从 v1.2.0 起，如果 ComfyUI 进程尚未包含同名变量，Windows 会在执行时安全回退读取当前用户环境变量，因此首次设置后不必完全退出整合包启动器。若进程已经继承了同名旧值，仍需重启 ComfyUI 才会切换到新值。
 
 如果同一个密钥明确允许多个 origin，`_ORIGIN` 可以使用英文逗号分隔。origin 必须包含协议和主机，可带端口，但不能带路径或通配符。这个绑定不会写入工作流，可防止导入的工作流把环境变量密钥改发到另一台服务器、端口或明文协议。
 
 公开节点刻意不提供“直接填写密钥”输入框，因为这类值会以明文进入 ComfyUI 工作流、历史记录和截图。请使用上面的专用环境变量；工作流 JSON 中只保存变量名，不保存密钥。
+
+从 v1.2.0 起，公开运行时提供了一个供可信本地附加包使用的固定凭证槽接口。凭证槽只保存在 ComfyUI 进程内存中，并绑定完整 API 配置；公开节点本身仍不显示或接受直接密钥。此接口用于单用户、本机回环地址部署，不适用于通过局域网或反向代理共享的 ComfyUI。
 
 执行时，任务文本、Skill 指令、选定的 reference 和参考图片会发送到你填写的第三方 API。GiftMasterCreator 不包含遥测，也不把这些内容发送到其他地址。更多说明见 [SECURITY.md](SECURITY.md)。
 
