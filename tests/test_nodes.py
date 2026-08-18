@@ -108,6 +108,11 @@ class NodeRegistrationTests(unittest.TestCase):
 
         api_inputs = api_config.INPUT_TYPES()["required"]
         self.assertEqual("GIFTMASTER_API_KEY", api_inputs["api_key_env"][1]["default"])
+        self.assertEqual(
+            ["api_key", "bearer", "bytedance_compat"],
+            api_inputs["azure_auth"][0],
+        )
+        self.assertEqual("api_key", api_inputs["azure_auth"][1]["default"])
         self.assertNotIn("direct_api_key", api_inputs)
 
 

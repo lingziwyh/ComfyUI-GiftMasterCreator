@@ -83,6 +83,9 @@ API 礼物导演.H3提示词 ───→ 下游 H3 节点的 prompt
 - `protocol`: `azure_openai_chat`
 - 填写自己的 Azure endpoint、deployment 和 API version
 - 默认用 `api-key` 请求头，也可选择 Bearer
+- 若兼容网关明确要求同时发送 `api-key`、Bearer 和 `X-TT-LOGID`，将
+  `azure_auth` 设为 `bytedance_compat`。此模式不会内置服务地址、模型名称或密钥。
+  当 `token_parameter` 为 `auto` 时，该兼容模式固定使用 `max_tokens`。
 
 ### 本地或局域网兼容服务
 

@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Nothing yet.
 
+## [1.0.1] - 2026-08-18
+
+### Added
+
+- Added the opt-in `bytedance_compat` Azure authentication mode for gateways
+  that require `api-key`, Bearer authorization, and an `X-TT-LOGID` request ID
+  together. No provider endpoint, deployment name, or credential is bundled.
+
 ## [1.0.0] - 2026-08-18
 
 ### Added

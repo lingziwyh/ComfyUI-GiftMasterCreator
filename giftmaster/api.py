@@ -20,6 +20,7 @@ from .errors import APIError, ConfigurationError
 
 
 PROTOCOLS = ("openai_chat", "openai_responses", "azure_openai_chat")
+AZURE_AUTH_MODES = ("api_key", "bearer", "bytedance_compat")
 _KEY_VAULT: Dict[str, Tuple[str, str, float]] = {}
 _KEY_LOCK = threading.Lock()
 _SENSITIVE_QUERY = re.compile(r"(?:api[-_]?key|token|secret|auth|signature|credential|password)", re.I)
@@ -300,11 +301,16 @@ class APIClient:
         self.config = config
         self.opener = opener or request.build_opener(_NoRedirect())
 
-    def _headers(self, key: str) -> Dict[str, str]:
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.0.0"}
+    def _headers(self, key: str, request_id: str = "") -> Dict[str, str]:
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.0.1"}
         if not self.config.no_auth:
-            if self.config.protocol == "azure_openai_chat" and self.config.azure_auth == "api_key":
-                headers["api-key"] = key
+            if self.config.protocol == "azure_openai_chat":
+                if self.config.azure_auth in {"api_key", "bytedance_compat"}:
+                    headers["api-key"] = key
+                if self.config.azure_auth in {"bearer", "bytedance_compat"}:
+                    headers["Authorization"] = f"Bearer {key}"
+                if self.config.azure_auth == "bytedance_compat":
+                    headers["X-TT-LOGID"] = request_id or secrets.token_hex(16)
             else:
                 headers["Authorization"] = f"Bearer {key}"
         return headers
@@ -347,7 +353,10 @@ class APIClient:
             token_name = settings.token_parameter
             if token_name == "auto":
                 model = self.config.model.lower()
-                token_name = "max_completion_tokens" if (model.startswith("gpt-5") or re.match(r"o\d", model)) else "max_tokens"
+                if self.config.protocol == "azure_openai_chat" and self.config.azure_auth == "bytedance_compat":
+                    token_name = "max_tokens"
+                else:
+                    token_name = "max_completion_tokens" if (model.startswith("gpt-5") or re.match(r"o\d", model)) else "max_tokens"
             if token_name not in {"max_tokens", "max_completion_tokens"}:
                 raise ConfigurationError("token 参数只允许 auto、max_tokens 或 max_completion_tokens。")
             payload[token_name] = int(settings.max_output_tokens)
@@ -372,18 +381,23 @@ class APIClient:
         effective_model = cfg.model.strip() or (cfg.azure_deployment.strip() if cfg.protocol == "azure_openai_chat" else "")
         if not effective_model:
             raise ConfigurationError("模型名称不能为空。")
-        if cfg.protocol == "azure_openai_chat" and cfg.azure_auth not in {"api_key", "bearer"}:
-            raise ConfigurationError("Azure 鉴权方式只允许 api_key 或 bearer。")
+        if cfg.protocol == "azure_openai_chat" and cfg.azure_auth not in AZURE_AUTH_MODES:
+            raise ConfigurationError("Azure 鉴权方式只允许 api_key、bearer 或 bytedance_compat。")
         endpoint = build_endpoint(cfg)
         key = _resolve_key(cfg, endpoint)
         if key and ("\r" in key or "\n" in key or len(key) > 8192):
             raise ConfigurationError("API 密钥格式无效。")
         chosen = settings or GenerationSettings()
         body = json.dumps(self._payload(system_prompt, user_prompt, image_data_urls, chosen), ensure_ascii=False).encode("utf-8")
+        request_id = (
+            secrets.token_hex(16)
+            if cfg.protocol == "azure_openai_chat" and cfg.azure_auth == "bytedance_compat"
+            else ""
+        )
         attempts = 0
         while True:
             attempts += 1
-            req = request.Request(endpoint, data=body, headers=self._headers(key), method="POST")
+            req = request.Request(endpoint, data=body, headers=self._headers(key, request_id), method="POST")
             try:
                 with self.opener.open(req, timeout=int(cfg.timeout_seconds)) as response:
                     raw = response.read(16 * 1024 * 1024 + 1)

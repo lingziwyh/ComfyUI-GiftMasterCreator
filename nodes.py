@@ -31,7 +31,7 @@ class GiftMasterAPIConfigNode:
                 "allow_insecure_http": ("BOOLEAN", {"default": False}),
                 "azure_deployment": ("STRING", {"default": ""}),
                 "api_version": ("STRING", {"default": "2024-10-21"}),
-                "azure_auth": (["api_key", "bearer"], {"default": "api_key"}),
+                "azure_auth": (["api_key", "bearer", "bytedance_compat"], {"default": "api_key"}),
                 "context_window": ("INT", {"default": 128000, "min": 8192, "max": 2000000}),
                 "supports_images": ("BOOLEAN", {"default": True}),
             }

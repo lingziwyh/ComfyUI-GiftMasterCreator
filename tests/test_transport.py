@@ -69,6 +69,23 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual("system", body["messages"][0]["content"])
         self.assertEqual(1, info["requests"])
 
+    def test_non_azure_protocol_ignores_azure_compatibility_setting(self):
+        client = APIClient(
+            APIConfig(
+                protocol="openai_chat",
+                base_url=self.base,
+                model="gpt-5-unit",
+                azure_auth="bytedance_compat",
+                no_auth=True,
+                retries=0,
+            )
+        )
+        client.complete("system", "task")
+        _path, headers, body = _Handler.calls[0]
+        self.assertEqual(4096, body["max_completion_tokens"])
+        self.assertNotIn("max_tokens", body)
+        self.assertNotIn("X-TT-LOGID", headers)
+
     def test_responses_payload_keeps_image_order(self):
         _Handler.protocol_kind = "responses"
         client = APIClient(
@@ -156,8 +173,45 @@ class LocalServerTests(unittest.TestCase):
         )
         normalized_headers = {key.lower(): value for key, value in headers.items()}
         self.assertEqual("azure-unit-secret", normalized_headers["api-key"])
+        self.assertNotIn("authorization", normalized_headers)
+        self.assertNotIn("x-tt-logid", normalized_headers)
         self.assertNotIn("model", body)
         self.assertEqual("gift deployment", info["model"])
+
+    def test_bytedance_compat_sends_dual_auth_and_stable_log_id(self):
+        name = "GIFTMASTER_BYTEDANCE_COMPAT_UNIT_KEY"
+        secret = "bytedance-unit-secret"
+        os.environ[name] = secret
+        os.environ[name + "_ORIGIN"] = f"http://127.0.0.1:{self.server.server_port}"
+        self.addCleanup(os.environ.pop, name, None)
+        self.addCleanup(os.environ.pop, name + "_ORIGIN", None)
+        _Handler.statuses = [429, 200]
+        config = APIConfig(
+            protocol="azure_openai_chat",
+            base_url=f"http://127.0.0.1:{self.server.server_port}/gateway",
+            model="gpt-unit",
+            azure_deployment="gpt-unit",
+            api_version="2024-02-01",
+            azure_auth="bytedance_compat",
+            api_key_env=name,
+            retries=1,
+        )
+        text, _info = APIClient(config).complete("system", "task")
+        self.assertEqual("chat result", text)
+        path, headers, body = _Handler.calls[0]
+        normalized_headers = {key.lower(): value for key, value in headers.items()}
+        self.assertEqual(
+            "/gateway/openai/deployments/gpt-unit/chat/completions?api-version=2024-02-01",
+            path,
+        )
+        self.assertEqual(secret, normalized_headers["api-key"])
+        self.assertEqual(f"Bearer {secret}", normalized_headers["authorization"])
+        self.assertRegex(normalized_headers["x-tt-logid"], r"^[0-9a-f]{32}$")
+        self.assertEqual("gpt-unit", body["model"])
+        self.assertEqual(4096, body["max_tokens"])
+        self.assertNotIn("max_completion_tokens", body)
+        retry_headers = {key.lower(): value for key, value in _Handler.calls[1][1].items()}
+        self.assertEqual(normalized_headers["x-tt-logid"], retry_headers["x-tt-logid"])
 
 
 class _TimeoutOpener:
