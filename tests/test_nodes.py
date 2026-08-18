@@ -102,6 +102,13 @@ class NodeRegistrationTests(unittest.TestCase):
         self.assertEqual("STRING", executor.RETURN_TYPES[0])
         self.assertEqual("STRING", validator.RETURN_TYPES[0])
 
+        runtime_bridge = api_config.GIFTMASTER_RUNTIME_API
+        self.assertEqual(2, runtime_bridge["abi_version"])
+        self.assertIs(runtime_bridge["APIConfig"], self.plugin.nodes.APIConfig)
+        self.assertTrue(callable(runtime_bridge["store_session_key_slot"]))
+        self.assertTrue(callable(runtime_bridge["clear_session_key_slot"]))
+        self.assertTrue(callable(runtime_bridge["is_session_key_slot_configured"]))
+
         executor_inputs = executor.INPUT_TYPES()
         required = executor_inputs["required"]
         optional = executor_inputs.get("optional", {})

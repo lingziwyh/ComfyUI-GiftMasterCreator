@@ -5,7 +5,14 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Tuple
 
-from .giftmaster.api import APIConfig, GenerationSettings, validate_api_url
+from .giftmaster.api import (
+    APIConfig,
+    GenerationSettings,
+    clear_session_key_slot,
+    is_session_key_slot_configured,
+    store_session_key_slot,
+    validate_api_url,
+)
 from .giftmaster.errors import ValidationError
 from .giftmaster.executor import run_skill_api
 from .giftmaster.h3 import validate_h3_prompt
@@ -17,6 +24,17 @@ _MODES = ["T2VA", "Ref2VA", "I2VA", "FL2VA", "L2VA"]
 
 
 class GiftMasterAPIConfigNode:
+    # Versioned bridge used by trusted companion extensions. Keeping the
+    # bridge on the active ComfyUI node class avoids importing a second copy
+    # of giftmaster.api (and therefore a second in-memory credential vault).
+    GIFTMASTER_RUNTIME_API = {
+        "abi_version": 2,
+        "APIConfig": APIConfig,
+        "store_session_key_slot": store_session_key_slot,
+        "clear_session_key_slot": clear_session_key_slot,
+        "is_session_key_slot_configured": is_session_key_slot_configured,
+    }
+
     @classmethod
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {

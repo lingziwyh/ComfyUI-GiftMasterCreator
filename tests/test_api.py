@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from giftmaster.api import (
     APIConfig,
+    _resolve_key,
     build_endpoint,
+    clear_session_key_slot,
     clear_session_keys,
+    is_session_key_slot_configured,
     parse_api_response,
     redact_text,
     store_session_key,
+    store_session_key_slot,
     validate_api_url,
 )
 from giftmaster.errors import APIError, ConfigurationError
@@ -165,6 +171,66 @@ class APISecretSafetyTests(unittest.TestCase):
         serialized = json.dumps(APIConfig(api_key_ref=reference).__dict__, ensure_ascii=False)
         self.assertNotIn(secret, serialized)
 
+    def test_session_key_reference_is_excluded_from_config_repr(self):
+        secret = "unit-test-direct-secret-value"
+        reference = store_session_key(secret)
+        rendered = repr(APIConfig(api_key_ref=reference))
+        self.assertNotIn(reference, rendered)
+        self.assertNotIn(secret, rendered)
+
+    def test_fixed_session_slot_is_runtime_only_and_bound_to_exact_config(self):
+        slot = "GIFTMASTER_TEST_SLOT"
+        secret = "unit-test-slot-secret"
+        config = APIConfig(
+            protocol="openai_chat",
+            base_url="https://example.com/v1",
+            model="bound-model",
+            api_key_env="",
+            api_key_slot=slot,
+        )
+        store_session_key_slot(slot, secret, config)
+        self.assertTrue(is_session_key_slot_configured(slot))
+        self.assertEqual(secret, _resolve_key(config, build_endpoint(config)))
+
+        changed = APIConfig(
+            protocol="openai_chat",
+            base_url="https://example.com/v1",
+            model="different-model",
+            api_key_env="",
+            api_key_slot=slot,
+        )
+        with self.assertRaisesRegex(ConfigurationError, "不匹配"):
+            _resolve_key(changed, build_endpoint(changed))
+
+        self.assertTrue(clear_session_key_slot(slot))
+        self.assertFalse(is_session_key_slot_configured(slot))
+
+    def test_invalid_slot_replacement_preserves_existing_secret(self):
+        slot = "GIFTMASTER_TEST_SLOT"
+        config = APIConfig(
+            protocol="openai_chat",
+            base_url="https://example.com/v1",
+            model="bound-model",
+            api_key_env="",
+            api_key_slot=slot,
+        )
+        store_session_key_slot(slot, "existing-secret", config)
+        with self.assertRaises(ConfigurationError):
+            store_session_key_slot(slot, "bad\nsecret", config)
+        self.assertEqual("existing-secret", _resolve_key(config, build_endpoint(config)))
+
+    def test_session_slot_cannot_be_combined_with_other_key_sources(self):
+        config = APIConfig(
+            protocol="openai_chat",
+            base_url="https://example.com/v1",
+            model="bound-model",
+            api_key_env="GIFTMASTER_OTHER_KEY",
+            api_key_ref="another-source",
+            api_key_slot="GIFTMASTER_TEST_SLOT",
+        )
+        with self.assertRaisesRegex(ConfigurationError, "不能与其他"):
+            _resolve_key(config, build_endpoint(config))
+
     def test_redacts_explicit_and_structured_secrets(self):
         secret = "unit-test-secret-value"
         redacted = redact_text(
@@ -173,6 +239,80 @@ class APISecretSafetyTests(unittest.TestCase):
         )
         self.assertNotIn(secret, redacted)
         self.assertIn("[REDACTED]", redacted)
+
+    def test_windows_user_environment_fallback_handles_recently_set_key(self):
+        env_name = "GIFTMASTER_TEST_RECENT_KEY"
+        registry_values = {
+            env_name: "registry-secret",
+            env_name + "_ORIGIN": "https://example.com",
+        }
+        config = APIConfig(api_key_env=env_name, model="model")
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "giftmaster.api._read_windows_user_environment",
+            side_effect=lambda name: registry_values.get(name, ""),
+        ):
+            self.assertEqual(
+                "registry-secret",
+                _resolve_key(config, "https://example.com/v1/chat/completions"),
+            )
+
+    def test_process_environment_takes_precedence_over_windows_fallback(self):
+        env_name = "GIFTMASTER_TEST_EXISTING_KEY"
+        config = APIConfig(api_key_env=env_name, model="model")
+        with patch.dict(
+            os.environ,
+            {
+                env_name: "process-secret",
+                env_name + "_ORIGIN": "https://example.com",
+            },
+            clear=True,
+        ), patch(
+            "giftmaster.api._read_windows_user_environment",
+            return_value="registry-secret",
+        ) as registry_read:
+            self.assertEqual(
+                "process-secret",
+                _resolve_key(config, "https://example.com/v1/chat/completions"),
+            )
+            registry_read.assert_not_called()
+
+    def test_process_key_without_process_origin_never_mixes_registry_origin(self):
+        env_name = "GIFTMASTER_TEST_PROCESS_ONLY_KEY"
+        config = APIConfig(api_key_env=env_name, model="model")
+        with patch.dict(os.environ, {env_name: "process-secret"}, clear=True), patch(
+            "giftmaster.api._read_windows_user_environment",
+            return_value="https://example.com",
+        ) as registry_read, self.assertRaises(ConfigurationError):
+            _resolve_key(config, "https://example.com/v1/chat/completions")
+        registry_read.assert_not_called()
+
+    def test_empty_process_key_explicitly_blocks_registry_fallback(self):
+        env_name = "GIFTMASTER_TEST_DISABLED_KEY"
+        config = APIConfig(api_key_env=env_name, model="model")
+        with patch.dict(os.environ, {env_name: ""}, clear=True), patch(
+            "giftmaster.api._read_windows_user_environment",
+            return_value="registry-secret",
+        ) as registry_read, self.assertRaises(ConfigurationError):
+            _resolve_key(config, "https://example.com/v1/chat/completions")
+        registry_read.assert_not_called()
+
+    def test_registry_key_without_registry_origin_is_rejected(self):
+        env_name = "GIFTMASTER_TEST_REGISTRY_KEY_ONLY"
+        config = APIConfig(api_key_env=env_name, model="model")
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "giftmaster.api._read_windows_user_environment",
+            side_effect=lambda name: "registry-secret" if name == env_name else "",
+        ), self.assertRaises(ConfigurationError):
+            _resolve_key(config, "https://example.com/v1/chat/completions")
+
+    def test_invalid_environment_name_never_reads_registry(self):
+        config = APIConfig(api_key_env="OTHER_PROVIDER_KEY", model="model")
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "giftmaster.api._read_windows_user_environment",
+            return_value="registry-secret",
+        ) as registry_read, self.assertRaises(ConfigurationError):
+            _resolve_key(config, "https://example.com/v1/chat/completions")
+        registry_read.assert_not_called()
 
     def test_public_runtime_contains_no_private_provider_defaults(self):
         root = Path(__file__).resolve().parents[1]
