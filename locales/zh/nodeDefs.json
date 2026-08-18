@@ -1,0 +1,361 @@
+{
+  "GiftMaster_APIConfig": {
+    "display_name": "GiftMaster · API 配置",
+    "description": "配置 GiftMasterCreator 使用的远程大模型 API。密钥通过受来源地址约束的环境变量读取。",
+    "inputs": {
+      "protocol": {
+        "name": "接口协议",
+        "tooltip": "选择服务商使用的 API 协议。",
+        "options": {
+          "openai_chat": "OpenAI 对话接口",
+          "openai_responses": "OpenAI Responses 接口",
+          "azure_openai_chat": "Azure OpenAI 对话接口"
+        }
+      },
+      "base_url": {
+        "name": "API 地址",
+        "tooltip": "填写 API 基础地址，也可填写完整的接口地址。"
+      },
+      "model": {
+        "name": "模型名称",
+        "tooltip": "填写服务商提供的模型 ID；Azure 可与部署名称相同。"
+      },
+      "api_key_env": {
+        "name": "密钥环境变量",
+        "tooltip": "这里只填写环境变量名称，不要直接粘贴密钥。变量名必须以 GIFTMASTER_ 开头。"
+      },
+      "no_auth": {
+        "name": "无需鉴权",
+        "tooltip": "仅无密钥的本地或可信服务开启。"
+      },
+      "timeout_seconds": {
+        "name": "请求超时（秒）",
+        "tooltip": "单次 API 请求最多等待的秒数。"
+      },
+      "retries": {
+        "name": "失败重试次数",
+        "tooltip": "只重试 429 限流和明确发生在连接前的失败；超时与 5xx 不会重放。"
+      },
+      "allow_insecure_http": {
+        "name": "允许不安全 HTTP",
+        "tooltip": "只适用于无鉴权的局域网 HTTP 服务；带密钥的远程请求始终要求 HTTPS。"
+      },
+      "azure_deployment": {
+        "name": "Azure 部署名称",
+        "tooltip": "Azure 或兼容网关的部署名称；留空时回退使用模型名称。"
+      },
+      "api_version": {
+        "name": "API 版本",
+        "tooltip": "Azure 接口的 api-version；非 Azure 协议会忽略。"
+      },
+      "azure_auth": {
+        "name": "Azure 鉴权方式",
+        "tooltip": "选择 Azure 鉴权头；字节兼容模式会同时发送 api-key、Bearer 和 X-TT-LOGID。",
+        "options": {
+          "api_key": "API Key 鉴权",
+          "bearer": "Bearer 鉴权",
+          "bytedance_compat": "字节兼容双鉴权"
+        }
+      },
+      "context_window": {
+        "name": "上下文长度",
+        "tooltip": "用于发送前的上下文预算检查，不会修改远程模型的真实上限。"
+      },
+      "supports_images": {
+        "name": "支持图片",
+        "tooltip": "关闭后，包含参考图的任务会在请求前报错。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "API 配置",
+        "tooltip": "可连接到“API 礼物导演”的安全 API 配置。"
+      }
+    }
+  },
+  "GiftMaster_GenerationSettings": {
+    "display_name": "GiftMaster · 生成设置",
+    "description": "设置 API 输出长度、可选采样参数和参考图压缩方式。",
+    "inputs": {
+      "max_output_tokens": {
+        "name": "最大输出 Token",
+        "tooltip": "允许模型返回的最大 Token 数。"
+      },
+      "token_parameter": {
+        "name": "输出 Token 参数",
+        "tooltip": "自动选择通常最稳；特殊兼容接口可明确指定 Token 参数名。",
+        "options": {
+          "auto": "自动选择",
+          "max_tokens": "max_tokens",
+          "max_completion_tokens": "max_completion_tokens"
+        }
+      },
+      "enable_sampling": {
+        "name": "发送高级采样参数",
+        "tooltip": "开启后才会发送采样温度和核采样范围。"
+      },
+      "temperature": {
+        "name": "采样温度",
+        "tooltip": "只有开启高级采样参数时才发送。"
+      },
+      "top_p": {
+        "name": "核采样范围",
+        "tooltip": "只有开启高级采样参数时才发送。"
+      },
+      "image_detail": {
+        "name": "图片细节",
+        "tooltip": "参考图发送给多模态模型时使用的细节等级。",
+        "options": {
+          "auto": "自动",
+          "high": "高细节",
+          "low": "低细节"
+        }
+      },
+      "image_max_edge": {
+        "name": "图片最长边",
+        "tooltip": "发送前将参考图最长边限制到该像素值。"
+      },
+      "jpeg_quality": {
+        "name": "JPEG 质量",
+        "tooltip": "参考图转为 JPEG 时的质量。"
+      },
+      "extra_system_prompt": {
+        "name": "附加系统要求",
+        "tooltip": "附加到 Skill 系统指令末尾的自定义要求；通常留空。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "生成设置",
+        "tooltip": "可选连接到“API 礼物导演”的生成设置。"
+      }
+    }
+  },
+  "GiftMaster_SkillLoader": {
+    "display_name": "GiftMaster · 礼物 Skill",
+    "description": "手动选择礼物 Skill，或让任务价格与标记自动决定。通用任务构建器可直接输出 Skill 路由，无需此节点。",
+    "inputs": {
+      "skill": {
+        "name": "礼物 Skill",
+        "tooltip": "自动模式会读取任务中的价格和 Skill 标记，不会额外调用分类 API。",
+        "options": {
+          "auto": "自动（按任务价格路由）",
+          "h3-low-coin-gift-director": "低价礼物导演（99–999 抖币）",
+          "h3-live-gift-director": "高价礼物导演（1000–3000 抖币）"
+        }
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Skill 选择",
+        "tooltip": "连接到“API 礼物导演”的 Skill 选择输入。"
+      }
+    }
+  },
+  "GiftMaster_LowCoinGiftTaskBuilder": {
+    "display_name": "GiftMaster · 低价礼物任务（99–999）",
+    "description": "构建 99–999 抖币低价礼物任务：固定单镜头、静音和 3–4 秒价格档规则。",
+    "inputs": {
+      "gift_name": {
+        "name": "礼物名称",
+        "tooltip": "直播礼物名称，不能为空。"
+      },
+      "gift_price": {
+        "name": "礼物价格（抖币）",
+        "tooltip": "99–299 抖币使用 73 帧；300–999 抖币使用 90 帧。"
+      },
+      "creative_brief": {
+        "name": "创意要求",
+        "tooltip": "描述主体、动作、风格、颜色与希望呈现的记忆点。"
+      },
+      "reference_mode": {
+        "name": "参考图模式",
+        "tooltip": "选择 H3 如何使用参考图；不同模式要求的图片数量不同。",
+        "options": {
+          "T2VA": "纯文字生成（T2VA）",
+          "Ref2VA": "普通参考图（Ref2VA）",
+          "I2VA": "精确首帧（I2VA）",
+          "FL2VA": "精确首尾帧（FL2VA）",
+          "L2VA": "精确尾帧（L2VA）"
+        }
+      },
+      "aspect_ratio": {
+        "name": "画幅比例",
+        "tooltip": "低价礼物只允许 1:1 或 4:3。"
+      },
+      "extra_constraints": {
+        "name": "额外约束",
+        "tooltip": "填写必须满足的额外限制；没有则留空。"
+      }
+    },
+    "outputs": {
+      "0": { "name": "任务", "tooltip": "包含低价规则和 Skill 标记的完整任务。" },
+      "1": { "name": "H3 帧数", "tooltip": "H3 对齐帧数。" },
+      "2": { "name": "实际时长", "tooltip": "帧数对应的实际秒数。" }
+    }
+  },
+  "GiftMaster_HighCoinGiftTaskBuilder": {
+    "display_name": "GiftMaster · 高价礼物任务（1000–3000）",
+    "description": "构建 1000–3000 抖币高价礼物任务，可设置时长、画幅、镜头结构与声音。",
+    "inputs": {
+      "gift_name": { "name": "礼物名称", "tooltip": "直播礼物名称，不能为空。" },
+      "gift_price": { "name": "礼物价格（抖币）", "tooltip": "价格用于约束视觉复杂度与自动镜头建议。" },
+      "creative_brief": { "name": "创意要求", "tooltip": "描述主体、情节、视觉升级、高潮和结尾记忆点。" },
+      "reference_mode": {
+        "name": "参考图模式",
+        "tooltip": "选择 H3 如何使用参考图；不同模式要求的图片数量不同。",
+        "options": {
+          "T2VA": "纯文字生成（T2VA）",
+          "Ref2VA": "普通参考图（Ref2VA）",
+          "I2VA": "精确首帧（I2VA）",
+          "FL2VA": "精确首尾帧（FL2VA）",
+          "L2VA": "精确尾帧（L2VA）"
+        }
+      },
+      "target_duration": { "name": "目标时长（秒）", "tooltip": "期望秒数会向上对齐到 H3 的 5+17n 帧序列。" },
+      "aspect_ratio": { "name": "画幅比例", "tooltip": "选择最终视频画幅。" },
+      "shot_structure": {
+        "name": "镜头结构",
+        "tooltip": "自动模式会按价格档给出镜头规模建议。",
+        "options": {
+          "自动": "自动（按价格建议）",
+          "单镜头": "单镜头",
+          "双镜头": "双镜头",
+          "三镜头": "三镜头"
+        }
+      },
+      "sound_design": { "name": "声音设计", "tooltip": "填写环境音、音效与音乐要求；留空时两个音频字段均使用 N/A。" },
+      "extra_constraints": { "name": "额外约束", "tooltip": "填写必须满足的额外限制；没有则留空。" }
+    },
+    "outputs": {
+      "0": { "name": "任务", "tooltip": "包含高价规则和 Skill 标记的完整任务。" },
+      "1": { "name": "H3 帧数", "tooltip": "H3 对齐帧数。" },
+      "2": { "name": "实际时长", "tooltip": "帧数对应的实际秒数。" }
+    }
+  },
+  "GiftMaster_GiftTaskBuilder": {
+    "display_name": "GiftMaster · 通用礼物任务（99–3000）",
+    "description": "推荐使用的通用礼物任务构建器。根据 99–3000 抖币价格自动选择低价或高价 Skill，无需额外的 Skill 节点。",
+    "inputs": {
+      "gift_name": { "name": "礼物名称", "tooltip": "直播礼物名称，不能为空。" },
+      "gift_price": { "name": "礼物价格（抖币）", "tooltip": "按价格自动路由：99–999 使用低价 Skill，1000–3000 使用高价 Skill。" },
+      "creative_brief": { "name": "创意要求", "tooltip": "描述主体、动作、风格、颜色、视觉升级和结尾记忆点。" },
+      "reference_mode": {
+        "name": "参考图模式",
+        "tooltip": "选择 H3 如何使用参考图；不同模式要求的图片数量不同。",
+        "options": {
+          "T2VA": "纯文字生成（T2VA）",
+          "Ref2VA": "普通参考图（Ref2VA）",
+          "I2VA": "精确首帧（I2VA）",
+          "FL2VA": "精确首尾帧（FL2VA）",
+          "L2VA": "精确尾帧（L2VA）"
+        }
+      },
+      "aspect_ratio": { "name": "画幅比例", "tooltip": "99–999 抖币只允许 1:1 或 4:3；1000–3000 抖币支持全部列出画幅。" },
+      "target_duration": { "name": "目标时长（秒）", "tooltip": "仅 1000–3000 抖币任务使用；低价任务按价格固定为 73 或 90 帧。" },
+      "shot_structure": {
+        "name": "镜头结构",
+        "tooltip": "仅 1000–3000 抖币任务使用；低价任务始终为单镜头。",
+        "options": {
+          "自动": "自动（按价格建议）",
+          "单镜头": "单镜头",
+          "双镜头": "双镜头",
+          "三镜头": "三镜头"
+        }
+      },
+      "sound_design": { "name": "声音设计", "tooltip": "仅 1000–3000 抖币任务使用；低价任务始终静音。" },
+      "extra_constraints": { "name": "额外约束", "tooltip": "填写必须满足的额外限制；没有则留空。" }
+    },
+    "outputs": {
+      "0": { "name": "任务", "tooltip": "包含价格档规则与 Skill 标记的完整任务。" },
+      "1": { "name": "H3 帧数", "tooltip": "H3 对齐帧数。" },
+      "2": { "name": "实际时长", "tooltip": "帧数对应的实际秒数。" },
+      "3": { "name": "Skill 路由", "tooltip": "已按价格确定的 Skill，可直接连接到“API 礼物导演”。" }
+    }
+  },
+  "GiftMaster_APISkillExecutor": {
+    "display_name": "GiftMaster · API 礼物导演",
+    "description": "读取礼物 Skill、任务和参考图，通过远程多模态 API 生成并校验 MiniMax H3 导演提示词。参考图接口会从 1 个开始按连接自动增加，最多 9 个。",
+    "inputs": {
+      "api_config": { "name": "API 配置", "tooltip": "连接“API 配置”节点。" },
+      "skill_selection": { "name": "Skill 路由", "tooltip": "连接通用任务构建器的“Skill 路由”，或连接“礼物 Skill”节点。" },
+      "task": { "name": "礼物任务", "tooltip": "连接礼物任务构建器输出的“任务”。" },
+      "reference_policy": {
+        "name": "Skill 参考资料策略",
+        "tooltip": "控制是否把 Skill 清单中的运行时文本资料加入系统提示词，不控制已连接图片；参考图始终按任务的 H3 模式处理。",
+        "options": {
+          "auto": "自动加载 Skill 文本资料",
+          "all": "加载全部 Skill 文本资料",
+          "none": "不加载 Skill 文本资料"
+        }
+      },
+      "missing_information_policy": {
+        "name": "缺失信息策略",
+        "tooltip": "信息不足时采用合理默认值，或直接停止并报错。",
+        "options": {
+          "reasonable_defaults": "使用合理默认值",
+          "error": "缺失即报错"
+        }
+      },
+      "auto_validate": { "name": "自动校验", "tooltip": "生成后自动检查 H3 格式和礼物规则。" },
+      "repair_attempts": { "name": "自动修复次数", "tooltip": "校验失败后允许模型自动修复的次数；每次都会产生一次新 API 请求。" },
+      "generation_settings": { "name": "生成设置", "tooltip": "可选。连接“生成设置”节点；不连接时使用安全默认值。" },
+      "image_1": { "name": "参考图 1", "tooltip": "连接后会自动显示参考图 2，最多支持 9 张。" },
+      "image_2": { "name": "参考图 2", "tooltip": "第 2 张参考图。" },
+      "image_3": { "name": "参考图 3", "tooltip": "第 3 张参考图。" },
+      "image_4": { "name": "参考图 4", "tooltip": "第 4 张参考图。" },
+      "image_5": { "name": "参考图 5", "tooltip": "第 5 张参考图。" },
+      "image_6": { "name": "参考图 6", "tooltip": "第 6 张参考图。" },
+      "image_7": { "name": "参考图 7", "tooltip": "第 7 张参考图。" },
+      "image_8": { "name": "参考图 8", "tooltip": "第 8 张参考图。" },
+      "image_9": { "name": "参考图 9", "tooltip": "第 9 张参考图，也是最大数量。" }
+    },
+    "outputs": {
+      "0": { "name": "H3 提示词", "tooltip": "可直接用于 MiniMax H3 的最终导演提示词。" },
+      "1": { "name": "运行信息", "tooltip": "包含路由、校验、修复与 Token 用量等运行信息。" }
+    }
+  },
+  "GiftMaster_H3PromptValidator": {
+    "display_name": "GiftMaster · H3 提示词校验",
+    "description": "独立检查并规范化 MiniMax H3 提示词，可自动采用礼物任务中的规则标记。",
+    "inputs": {
+      "prompt": { "name": "H3 提示词", "tooltip": "需要检查的 MiniMax H3 提示词。" },
+      "mode": {
+        "name": "H3 模式",
+        "tooltip": "自动识别，或明确指定 H3 的文字/参考图模式。",
+        "options": {
+          "auto": "自动识别",
+          "T2VA": "纯文字生成（T2VA）",
+          "Ref2VA": "普通参考图（Ref2VA）",
+          "I2VA": "精确首帧（I2VA）",
+          "FL2VA": "精确首尾帧（FL2VA）",
+          "L2VA": "精确尾帧（L2VA）"
+        }
+      },
+      "profile": {
+        "name": "规则类型",
+        "tooltip": "选择通用 H3、99–999 抖币低价礼物或 1000–3000 抖币高价礼物规则。",
+        "options": {
+          "GENERIC": "通用 H3",
+          "LOW_COIN_GIFT": "低价礼物（99–999 抖币）",
+          "LIVE_GIFT": "高价礼物（1000–3000 抖币）"
+        }
+      },
+      "gift_price": { "name": "礼物价格（抖币）", "tooltip": "未连接任务时，用于选择对应价格档规则。" },
+      "aspect_ratio": {
+        "name": "画幅比例",
+        "tooltip": "留空表示不额外检查画幅；连接任务时由任务标记覆盖。",
+        "options": { "": "不指定" }
+      },
+      "image_count": { "name": "参考图数量", "tooltip": "实际发送给视频模型的参考图数量。" },
+      "duration": { "name": "有效时长（秒）", "tooltip": "未连接任务时，用于检查提示词中的有效时长。" },
+      "fail_on_error": { "name": "校验失败即报错", "tooltip": "开启后，校验不通过会中止工作流。" },
+      "task": { "name": "礼物任务", "tooltip": "可选。连接任务后自动读取模式、价格、画幅和时长标记。" }
+    },
+    "outputs": {
+      "0": { "name": "规范化提示词", "tooltip": "清理后的 H3 提示词。" },
+      "1": { "name": "校验报告", "tooltip": "包含错误与警告的 JSON 校验报告。" },
+      "2": { "name": "是否通过", "tooltip": "全部硬性校验是否通过。" }
+    }
+  }
+}

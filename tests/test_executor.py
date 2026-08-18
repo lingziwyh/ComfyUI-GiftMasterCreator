@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from giftmaster.api import APIConfig, GenerationSettings
-from giftmaster.errors import SkillError, ValidationError
+from giftmaster.errors import GiftMasterError, SkillError, ValidationError
 from giftmaster.executor import run_skill_api
 from giftmaster.tasks import build_high_coin_task, build_low_coin_task
 
@@ -75,6 +75,19 @@ class ExecutorTests(unittest.TestCase):
         client = FakeClient([LOW_VALID])
         with self.assertRaises(SkillError):
             run_skill_api(self.config(), "h3-live-gift-director", task, client=client)
+        self.assertEqual([], client.calls)
+
+    def test_generic_task_cannot_override_builtin_price_routing(self):
+        task = """[GMC_PROFILE=GENERIC]
+[GMC_SKILL_ID=h3-low-coin-gift-director]
+[GMC_H3_MODE=T2VA]
+[GMC_H3_DURATION=5]
+[GMC_GIFT_PRICE=3000]
+[GMC_ASPECT=1:1]
+请生成礼物提示词。"""
+        client = FakeClient([LOW_VALID])
+        with self.assertRaisesRegex(GiftMasterError, "应使用"):
+            run_skill_api(self.config(), "auto", task, client=client)
         self.assertEqual([], client.calls)
 
     def test_ref2va_uses_images_in_input_order(self):

@@ -302,7 +302,7 @@ class APIClient:
         self.opener = opener or request.build_opener(_NoRedirect())
 
     def _headers(self, key: str, request_id: str = "") -> Dict[str, str]:
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.0.1"}
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "GiftMasterCreator/1.1.0"}
         if not self.config.no_auth:
             if self.config.protocol == "azure_openai_chat":
                 if self.config.azure_auth in {"api_key", "bytedance_compat"}:

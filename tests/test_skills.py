@@ -21,6 +21,21 @@ class SkillTests(unittest.TestCase):
         task, _frames, _seconds = build_low_coin_task("纸鹤", reference_mode="T2VA")
         self.assertEqual("h3-low-coin-gift-director", route_skill(task, "auto"))
 
+    def test_builtin_skill_cannot_conflict_with_generic_task_price(self):
+        low_skill = "h3-low-coin-gift-director"
+        high_skill = "h3-live-gift-director"
+        cases = (
+            (f"[GMC_PROFILE=GENERIC]\n[GMC_GIFT_PRICE=3000]\n[GMC_SKILL_ID={low_skill}]", "auto"),
+            (f"[GMC_PROFILE=GENERIC]\n[GMC_GIFT_PRICE=99]\n[GMC_SKILL_ID={high_skill}]", "auto"),
+            ("[GMC_PROFILE=GENERIC]\n[GMC_GIFT_PRICE=3000]", low_skill),
+        )
+        for task, selection in cases:
+            with self.subTest(task=task, selection=selection), self.assertRaisesRegex(SkillError, "应使用"):
+                route_skill(task, selection)
+
+        custom = "[GMC_PROFILE=GENERIC]\n[GMC_GIFT_PRICE=5000]\n[GMC_SKILL_ID=custom-gift-director]"
+        self.assertEqual("custom-gift-director", route_skill(custom, "auto"))
+
     def test_reference_path_traversal_is_rejected(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)

@@ -3,7 +3,14 @@ from __future__ import annotations
 import unittest
 
 from giftmaster.errors import GiftMasterError
-from giftmaster.tasks import build_high_coin_task, build_low_coin_task
+from giftmaster.tasks import (
+    HIGH_SKILL_ID,
+    LOW_SKILL_ID,
+    build_high_coin_task,
+    build_low_coin_task,
+    build_universal_gift_task,
+    parse_task_spec,
+)
 
 
 class LowCoinTaskTests(unittest.TestCase):
@@ -107,6 +114,83 @@ class HighCoinTaskTests(unittest.TestCase):
         self.assertEqual(107, frames)
         self.assertAlmostEqual(107 / 24, duration)
         self.assertIn("[GMC_H3_DURATION=4.458333]", task)
+
+
+class UniversalGiftTaskTests(unittest.TestCase):
+    def _build(
+        self,
+        price: int,
+        *,
+        aspect_ratio: str = "1:1",
+        target_duration: float = 5.0,
+        shot_structure: str = "三镜头",
+        sound_design: str = "清晰的爆炸音效",
+    ):
+        return build_universal_gift_task(
+            gift_name="通用礼物",
+            gift_price=price,
+            creative_brief="主体完成一次清晰的视觉升级后收束",
+            reference_mode="T2VA",
+            aspect_ratio=aspect_ratio,
+            target_duration=target_duration,
+            shot_structure=shot_structure,
+            sound_design=sound_design,
+            extra_constraints="结尾主体完整可见",
+        )
+
+    def test_routes_inclusive_price_boundaries_and_preserves_return_order(self):
+        cases = {
+            99: ("LOW_COIN_GIFT", LOW_SKILL_ID, 73, 73 / 24),
+            999: ("LOW_COIN_GIFT", LOW_SKILL_ID, 90, 90 / 24),
+            1000: ("LIVE_GIFT", HIGH_SKILL_ID, 124, 124 / 24),
+            3000: ("LIVE_GIFT", HIGH_SKILL_ID, 124, 124 / 24),
+        }
+        for price, (profile, expected_skill, expected_frames, expected_duration) in cases.items():
+            with self.subTest(price=price):
+                task, frames, duration, skill_id = self._build(price)
+                self.assertIsInstance(task, str)
+                self.assertIsInstance(frames, int)
+                self.assertIsInstance(duration, float)
+                self.assertIsInstance(skill_id, str)
+                self.assertEqual(expected_frames, frames)
+                self.assertAlmostEqual(expected_duration, duration)
+                self.assertEqual(expected_skill, skill_id)
+
+                spec = parse_task_spec(task)
+                self.assertEqual(price, spec.gift_price)
+                self.assertEqual(profile, spec.profile)
+                self.assertEqual(expected_skill, spec.skill_id)
+                self.assertEqual(expected_frames, spec.frames)
+
+    def test_rejects_prices_without_a_supported_skill(self):
+        for price in (0, 98, 3001):
+            with self.subTest(price=price), self.assertRaisesRegex(GiftMasterError, "99.*3000"):
+                self._build(price)
+
+    def test_low_tier_keeps_fixed_duration_single_shot_and_silence(self):
+        task, frames, duration, skill_id = self._build(
+            999,
+            target_duration=149.0,
+            shot_structure="三镜头",
+            sound_design="清晰的爆炸音效",
+        )
+        self.assertEqual(LOW_SKILL_ID, skill_id)
+        self.assertEqual(90, frames)
+        self.assertAlmostEqual(90 / 24, duration)
+        self.assertIn("恰好一个连续镜头", task)
+        self.assertIn("全程静音", task)
+        self.assertNotIn("三镜头", task)
+        self.assertNotIn("爆炸音效", task)
+        self.assertIn("结尾主体完整可见", task)
+
+    def test_low_tier_rejects_high_tier_only_aspect_ratio(self):
+        with self.assertRaisesRegex(GiftMasterError, "1:1.*4:3"):
+            self._build(999, aspect_ratio="9:16")
+
+    def test_high_tier_accepts_vertical_aspect_ratio(self):
+        task, _frames, _duration, skill_id = self._build(1000, aspect_ratio="9:16")
+        self.assertEqual(HIGH_SKILL_ID, skill_id)
+        self.assertIn("[GMC_ASPECT=9:16]", task)
 
 
 if __name__ == "__main__":

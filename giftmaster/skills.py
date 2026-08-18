@@ -9,8 +9,8 @@ from pathlib import Path
 import re
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from .errors import SkillError
-from .tasks import HIGH_SKILL_ID, LOW_SKILL_ID, parse_task_spec
+from .errors import GiftMasterError, SkillError
+from .tasks import HIGH_SKILL_ID, LOW_SKILL_ID, parse_task_spec, skill_id_for_price
 
 
 _SKILL_ID = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -151,17 +151,31 @@ def route_skill(task: str, selection: str = "auto") -> str:
     chosen = selection.strip()
     aliases = {"自动": "auto", "低价礼物": LOW_SKILL_ID, "高价礼物": HIGH_SKILL_ID}
     chosen = aliases.get(chosen, chosen)
+    expected_builtin = ""
+    if spec.gift_price is not None:
+        try:
+            expected_builtin = skill_id_for_price(spec.gift_price)
+        except GiftMasterError as exc:
+            needs_builtin_route = chosen in {LOW_SKILL_ID, HIGH_SKILL_ID} or spec.skill_id in {
+                LOW_SKILL_ID,
+                HIGH_SKILL_ID,
+            }
+            if chosen == "auto" and not spec.skill_id:
+                needs_builtin_route = True
+            if needs_builtin_route:
+                raise SkillError(str(exc)) from exc
     if chosen != "auto":
         if spec.skill_id and spec.skill_id != chosen:
             raise SkillError(f"固定 Skill {chosen} 与任务标记 {spec.skill_id} 冲突。")
+        if chosen in {LOW_SKILL_ID, HIGH_SKILL_ID} and expected_builtin and chosen != expected_builtin:
+            raise SkillError(f"礼物价格 {spec.gift_price} 应使用 {expected_builtin}，不能选择 {chosen}。")
         return chosen
     if spec.skill_id:
+        if spec.skill_id in {LOW_SKILL_ID, HIGH_SKILL_ID} and expected_builtin and spec.skill_id != expected_builtin:
+            raise SkillError(f"礼物价格 {spec.gift_price} 应使用 {expected_builtin}，不能使用 {spec.skill_id}。")
         return spec.skill_id
-    if spec.gift_price is not None:
-        if 99 <= spec.gift_price <= 999:
-            return LOW_SKILL_ID
-        if 1000 <= spec.gift_price <= 3000:
-            return HIGH_SKILL_ID
+    if expected_builtin:
+        return expected_builtin
     raise SkillError("自动选择需要 GiftMaster 任务标记；请使用礼物任务构建器，或固定选择 Skill。")
 
 
