@@ -10,7 +10,8 @@ GiftMasterCreator 是一套轻量的 ComfyUI 直播礼物创作组件：把礼�
 - 1000–3000 抖币：可设置时长、画幅、1–3 镜头和声音设计。
 - 支持 T2VA、I2VA、FL2VA、L2VA、Ref2VA。
 - 支持 OpenAI-compatible Chat Completions、OpenAI Responses API、Azure OpenAI Chat。
-- 内置高低价两套礼物 Skill，按任务标记确定性路由，不多花一次 API 分类请求。
+- `通用礼物任务（99–3000）` 按价格自动选择低价或高价 Skill，不多花一次 API 分类请求。
+- 节点、输入输出、下拉选项和提示信息使用中文 UI；API 礼物导演的参考图接口会按需从 1 个渐进增加到最多 9 个。
 - 自动检查图片数量、H3 顶层字段、镜头切点、参考图编号和低价礼物硬规则；最多自动修复两次。
 
 ## 安装
@@ -31,26 +32,38 @@ ComfyUI/custom_nodes/ComfyUI-GiftMasterCreator
 
 ## 在 ComfyUI 中使用
 
-右键画布，在 `GiftMasterCreator` 分类中添加以下节点：
+右键画布，在 `GiftMasterCreator` 分类中添加以下节点。v1.1.0 推荐使用这条最短路径：
 
 1. `GiftMaster · API 配置`
 2. `GiftMaster · 生成设置`（可选）
-3. `GiftMaster · 礼物 Skill`
-4. `GiftMaster · 低价礼物任务（99–999）` 或 `GiftMaster · 高价礼物任务（1000–3000）`
-5. `GiftMaster · API 礼物导演`
+3. `GiftMaster · 通用礼物任务（99–3000）`
+4. `GiftMaster · API 礼物导演`
+
+通用任务构建器会根据 `礼物价格（抖币）` 自动路由：
+
+| 礼物价格 | 自动使用的规则 | 主要行为 |
+|---|---|---|
+| 99–999 抖币 | 低价礼物 Skill | 3–4 秒、单镜头、静音，并执行低价背景规则 |
+| 1000–3000 抖币 | 高价礼物 Skill | 使用可设置的时长、画幅、镜头结构和声音设计 |
+
+选择 99–999 抖币时，`目标时长`、`镜头结构` 和 `声音设计` 不会覆盖低价硬规则，画幅请选择 `1:1` 或 `4:3`；选择 1000–3000 抖币时，这些高价参数会正常生效。
+
+它会输出 `任务`、`H3帧数`、`实际时长` 和 `Skill路由`。其中两路连接必须同时接入导演：把 `任务` 接到 API 礼物导演的任务输入，把 `Skill路由` 接到对应的 Skill 路由输入。
 
 连接方式：
 
 ```text
-API 配置 ───────────────┐
-礼物 Skill（auto）──────┼─→ API 礼物导演 ─→ H3提示词
-礼物任务.任务 ──────────┤
-生成设置（可选）────────┤
-Load Image（按模式）────┘
+API 配置 ─────────────────────┐
+通用礼物任务.Skill路由 ───────┤
+通用礼物任务.任务 ────────────┼─→ API 礼物导演 ─→ H3提示词
+生成设置（可选）──────────────┤
+Load Image（按模式，最多 9 张）┘
 
-礼物任务.H3帧数 ─────────→ 下游 H3 节点的 length
-API 礼物导演.H3提示词 ───→ 下游 H3 节点的 prompt
+通用礼物任务.H3帧数 ───────────→ 下游 H3 节点的 length
+API 礼物导演.H3提示词 ─────────→ 下游 H3 节点的 prompt
 ```
+
+API 礼物导演初始只显示 `参考图 1`。连接当前最后一个图片口后会自动出现下一个接口，依次增加为 `参考图 2`、`参考图 3`，最多到 `参考图 9`。断开图片后，末尾连续空闲的接口会自动回收，但始终保留 `参考图 1`。旧工作流中已经连接的图片口不会被删除；未达到 9 个时，界面还会在最后一个已连接口之后保留一个空口。内部接口仍使用 `image_1` 到 `image_9`，因此已有工作流可以继续加载。
 
 参考图数量必须与模式一致：
 
@@ -62,7 +75,11 @@ API 礼物导演.H3提示词 ───→ 下游 H3 节点的 prompt
 | L2VA | 1 | 精确尾帧 |
 | Ref2VA | 1–9 | 普通参考图，按端口和批次顺序 |
 
-可直接导入 [`examples/workflows/low-coin-t2va-api.json`](examples/workflows/low-coin-t2va-api.json) 查看最小工作流；高价参考图版本见 [`examples/workflows/high-coin-ref2va-api.json`](examples/workflows/high-coin-ref2va-api.json)。导入后填写自己的 API 地址与模型，并按下文设置专用环境变量密钥。高价示例中的 `example.png` 只是占位名，请在 `Load Image` 节点重新选择自己的图片。
+推荐先导入 [`examples/workflows/universal-auto-t2va-api.json`](examples/workflows/universal-auto-t2va-api.json)，查看通用任务构建器如何把 `任务` 和 `Skill路由` 两路输出直连 API 礼物导演。旧版最小工作流仍见 [`examples/workflows/low-coin-t2va-api.json`](examples/workflows/low-coin-t2va-api.json)，高价参考图版本见 [`examples/workflows/high-coin-ref2va-api.json`](examples/workflows/high-coin-ref2va-api.json)。导入后填写自己的 API 地址与模型，并按下文设置专用环境变量密钥。高价示例中的 `example.png` 只是占位名，请在 `Load Image` 节点重新选择自己的图片。
+
+### 旧节点兼容
+
+`GiftMaster · 低价礼物任务（99–999）`、`GiftMaster · 高价礼物任务（1000–3000）` 和 `GiftMaster · 礼物 Skill` 仍然保留，节点 ID 与已有工作流连接方式不变。新建工作流建议改用通用任务构建器；旧工作流不需要强制迁移。
 
 ## API 配置
 

@@ -1,6 +1,6 @@
 [project]
 name = "giftmaster-creator"
-version = "1.0.1"
+version = "1.1.0"
 description = "Lightweight API and Skill nodes for creating H3 live-gift prompts in ComfyUI"
 readme = "README.md"
 requires-python = ">=3.10"

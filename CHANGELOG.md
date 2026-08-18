@@ -11,6 +11,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Nothing yet.
 
+## [1.1.0] - 2026-08-18
+
+### Added
+
+- Added the Chinese `GiftMaster · 通用礼物任务（99–3000）` node. It routes
+  99–999-coin tasks to the low-price Skill and 1000–3000-coin tasks to the
+  high-price Skill without an extra classifier request.
+- Added separate `任务` and `Skill路由` outputs from the universal builder for
+  direct connection to the corresponding API gift-director inputs, alongside
+  the existing H3 frame-count and effective-duration outputs.
+- Added progressive Chinese reference-image ports on the API gift director.
+  The UI starts with `参考图 1` and reveals the next port as images are
+  connected, up to `参考图 9`.
+- Added `examples/workflows/universal-auto-t2va-api.json` for the recommended
+  v1.1.0 workflow.
+
+### Changed
+
+- Localized GiftMaster node labels, inputs, outputs, choices, descriptions, and
+  tooltips for a Chinese-first ComfyUI experience while retaining stable
+  internal identifiers.
+- Enforced the built-in low/high Skill boundary even when an imported generic
+  task contains conflicting price and Skill markers.
+- Kept the separate low-price builder, high-price builder, and Skill-loader
+  nodes registered so existing workflows continue to load without migration.
+
 ## [1.0.1] - 2026-08-18
 
 ### Added

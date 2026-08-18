@@ -28,6 +28,16 @@ class GiftTaskSpec:
     frames: Optional[int] = None
 
 
+def skill_id_for_price(gift_price: int) -> str:
+    """Return the built-in Skill ID for a supported Douyin-coin price."""
+    price = int(gift_price)
+    if 99 <= price <= 999:
+        return LOW_SKILL_ID
+    if 1000 <= price <= 3000:
+        return HIGH_SKILL_ID
+    raise GiftMasterError("礼物价格必须在 99–3000 抖币之间。")
+
+
 def align_h3_frames(seconds: float) -> Tuple[int, float]:
     """Round upward to H3's 5+17n frame sequence at 24 fps."""
     if not 0.1 <= float(seconds) <= 149.0:
@@ -195,6 +205,45 @@ def build_high_coin_task(
     return body, frames, duration
 
 
+def build_universal_gift_task(
+    gift_name: str,
+    gift_price: int = 499,
+    creative_brief: str = "",
+    reference_mode: str = "Ref2VA",
+    aspect_ratio: str = "1:1",
+    target_duration: float = 5.0,
+    shot_structure: str = "自动",
+    sound_design: str = "",
+    extra_constraints: str = "",
+) -> Tuple[str, int, float, str]:
+    """Build the matching price-tier task and return its deterministic Skill ID."""
+    price = int(gift_price)
+    skill_id = skill_id_for_price(price)
+    resolved_aspect = "1:1" if aspect_ratio in {"", "auto", "自动", "自动（默认 1:1）"} else aspect_ratio
+    if skill_id == LOW_SKILL_ID:
+        task, frames, duration = build_low_coin_task(
+            gift_name=gift_name,
+            gift_price=price,
+            creative_brief=creative_brief,
+            reference_mode=reference_mode,
+            aspect_ratio=resolved_aspect,
+            extra_constraints=extra_constraints,
+        )
+        return task, frames, duration, skill_id
+    task, frames, duration = build_high_coin_task(
+        gift_name=gift_name,
+        gift_price=price,
+        creative_brief=creative_brief,
+        reference_mode=reference_mode,
+        target_duration=target_duration,
+        aspect_ratio=resolved_aspect,
+        shot_structure=shot_structure,
+        sound_design=sound_design,
+        extra_constraints=extra_constraints,
+    )
+    return task, frames, duration, skill_id
+
+
 def parse_task_markers(task: str) -> Dict[str, str]:
     found: Dict[str, str] = {}
     for key, value in _MARKER_RE.findall(task or ""):
@@ -238,6 +287,10 @@ def validate_task_spec(spec: GiftTaskSpec) -> None:
         raise GiftMasterError(f"未知 H3 模式：{spec.mode}")
     if not 0.1 <= float(spec.duration) <= 149.0:
         raise GiftMasterError("任务中的有效时长必须在 0.1–149 秒之间。")
+    if spec.gift_price is not None and spec.skill_id in {LOW_SKILL_ID, HIGH_SKILL_ID}:
+        expected_skill = skill_id_for_price(spec.gift_price)
+        if spec.skill_id != expected_skill:
+            raise GiftMasterError(f"任务中的价格应使用 {expected_skill}，但 Skill 标记为 {spec.skill_id}。")
     if spec.profile == "LOW_COIN_GIFT":
         if spec.gift_price is None or not 99 <= spec.gift_price <= 999:
             raise GiftMasterError("LOW_COIN_GIFT 任务必须包含 99–999 抖币价格。")

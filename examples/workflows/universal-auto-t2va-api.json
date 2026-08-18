@@ -1,0 +1,180 @@
+{
+  "last_node_id": 4,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "GiftMaster_APIConfig",
+      "pos": [20, 20],
+      "size": [370, 500],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "API配置",
+          "type": "GIFTMASTER_API_CONFIG",
+          "links": [1]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GiftMaster_APIConfig"
+      },
+      "widgets_values": [
+        "openai_chat",
+        "https://api.openai.com/v1",
+        "",
+        "GIFTMASTER_API_KEY",
+        false,
+        120,
+        0,
+        false,
+        "",
+        "2024-10-21",
+        "api_key",
+        128000,
+        true
+      ]
+    },
+    {
+      "id": 2,
+      "type": "GiftMaster_GenerationSettings",
+      "pos": [20, 550],
+      "size": [370, 360],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "生成设置",
+          "type": "GIFTMASTER_GENERATION_SETTINGS",
+          "links": [4]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GiftMaster_GenerationSettings"
+      },
+      "widgets_values": [
+        4096,
+        "auto",
+        false,
+        0.7,
+        1.0,
+        "auto",
+        1024,
+        90,
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "GiftMaster_GiftTaskBuilder",
+      "pos": [440, 20],
+      "size": [450, 560],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "任务",
+          "type": "STRING",
+          "links": [2]
+        },
+        {
+          "name": "H3帧数",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "实际时长",
+          "type": "FLOAT",
+          "links": null
+        },
+        {
+          "name": "Skill路由",
+          "type": "GIFTMASTER_SKILL_SELECTION",
+          "links": [3]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GiftMaster_GiftTaskBuilder"
+      },
+      "widgets_values": [
+        "示例通用礼物",
+        999,
+        "主体完成一次清晰动作后退场",
+        "T2VA",
+        "1:1",
+        5.0,
+        "自动",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "GiftMaster_APISkillExecutor",
+      "pos": [950, 80],
+      "size": [470, 460],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api_config",
+          "type": "GIFTMASTER_API_CONFIG",
+          "link": 1
+        },
+        {
+          "name": "skill_selection",
+          "type": "GIFTMASTER_SKILL_SELECTION",
+          "link": 3
+        },
+        {
+          "name": "task",
+          "type": "STRING",
+          "link": 2
+        },
+        {
+          "name": "generation_settings",
+          "type": "GIFTMASTER_GENERATION_SETTINGS",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "H3提示词",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "运行信息",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GiftMaster_APISkillExecutor"
+      },
+      "widgets_values": [
+        "auto",
+        "reasonable_defaults",
+        true,
+        1
+      ]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 4, 0, "GIFTMASTER_API_CONFIG"],
+    [2, 3, 0, 4, 2, "STRING"],
+    [3, 3, 3, 4, 1, "GIFTMASTER_SKILL_SELECTION"],
+    [4, 2, 0, 4, 3, "GIFTMASTER_GENERATION_SETTINGS"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
